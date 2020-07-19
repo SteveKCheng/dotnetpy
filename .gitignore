@@ -1,0 +1,8 @@
+.vscode/
+.vs/
+__pycache__/
+dotnetpy/linux-x64/libnethost.so
+dotnetpy/win-x64/nethost.dll
+dotnetpy/win-x86/nethost.dll
+example/CSharpExample/bin/
+example/CSharpExample/obj/
