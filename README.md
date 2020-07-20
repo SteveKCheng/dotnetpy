@@ -19,8 +19,15 @@ formatting or message serialization to pass more complex data.  It should also b
 possible to get .NET code to work with Python objects by calling CPython's API
 through [P/Invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke).
 
-Example
--------
+Quick start
+-----------
+
+First, run 
+
+    ./get_nethost_dlls.py dotnetpy
+
+to download the ``nethost`` DLLs (for all supported platforms) from NuGet packages
+published by Microsoft.  These binary files are not checked in to this repository.
 
 After compiling the [example C# source code](example/CSharpExample/LibraryFunctions.cs), running ``test.py`` results in:
 
