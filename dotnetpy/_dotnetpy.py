@@ -20,8 +20,11 @@ if sys.platform == 'win32':
     c_tchar_p = ctypes.c_wchar_p 
     c_tstring = c_tchar_p 
 
-    def to_tstring(s):
+    def to_tstring(s: Optional[str]):
         return s
+
+    def from_tstring(s: Optional[c_tchar_p]) -> Optional[str]:
+        return ctypes.wstring_at(s) if s else None
 
     def create_tstring_buffer(init_or_size): 
         return ctypes.create_unicode_buffer(init_or_size) 
@@ -40,8 +43,11 @@ else:
 
     c_tchar_p = ctypes.c_char_p 
 
-    def to_tstring(s): 
-        return s.encode('utf-8') 
+    def to_tstring(s: Optional[str]): 
+        return s.encode('utf-8') if s else None 
+
+    def from_tstring(s: Optional[c_tchar_p]) -> Optional[str]:
+        return ctypes.string_at(s).decode('utf-8') if s else None
 
     def create_tstring_buffer(init_or_size): 
         if isinstance(init_or_size, str):
@@ -178,11 +184,11 @@ class DotNetSession():
 
         nethost = DotNetSession._get_nethost_dll() 
 
-        pathBuf = create_tstring_buffer (4096) 
+        pathBuf = create_tstring_buffer(4096) 
         pathBufLen = ctypes.c_size_t(len(pathBuf)) 
 
-        nethost.get_hostfxr_path(pathBuf,  pathBufLen, None) 
-        return pathBuf.value 
+        nethost.get_hostfxr_path(pathBuf, pathBufLen, None) 
+        return from_tstring(pathBuf)
 
     @classmethod
     def _get_hostfxr_dll(cls, path: str):
@@ -233,7 +239,6 @@ class DotNetSession():
         f.argtypes = [ c_hostfxr_handle ] 
 
         return hostfxr
-
 
     def __init__(self, 
                  config_path: Optional[str] = None,
@@ -293,7 +298,10 @@ class DotNetSession():
             self._load_assembly_and_get_function_pointer = f
 
         delegate = ctypes.c_void_p()
-        err = f(assembly_path, type_name, method_name, delegate_name, None, delegate) 
+        err = f(to_tstring(assembly_path), 
+                to_tstring(type_name), 
+                to_tstring(method_name), 
+                to_tstring(delegate_name), None, delegate) 
         if err < 0: 
             raise ValueError("load_assembly_and_get_function_pointer failed") 
 
@@ -312,6 +320,5 @@ class DotNetSession():
                                                  keys_array, 
                                                  values_array) 
 
-        return [ (keys_array[i], values_array[i]) \
-                 for i in range(count.value) ] 
-
+        return [ (from_tstring(keys_array[i]), from_tstring(values_array[i])) \
+                 for i in range(count.value) ]
