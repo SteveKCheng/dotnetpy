@@ -1,8 +1,6 @@
-from dotnetpy import HostFxr
+from dotnetpy import DotNetSession
 import os.path
 import sys
-
-hostfxr = HostFxr() 
 
 this_dir = os.path.dirname(__file__)
 
@@ -11,20 +9,16 @@ if not os.path.exists(assembly_path):
     print(f"{assembly_path} not found; please compile the .NET assembly first", file=sys.stderr)
     sys.exit(2)
 
-handle = hostfxr.initialize_for_runtime_config( 
-            os.path.join(this_dir, "example/DotNetRuntimeConfig.json"),
-            None) 
+session = DotNetSession(config_path=os.path.join(this_dir, "example/DotNetRuntimeConfig.json"))
 
-properties = hostfxr.get_runtime_properties(handle) 
+properties = session.get_runtime_properties()
 for key, value in properties: 
     print("%s = %s" % (key, value)) 
 
-my_function = hostfxr.load_assembly_and_get_function_pointer( 
-    handle, 
+my_function = session.load_assembly_and_get_function_pointer( 
     assembly_path,
     "CSharpExample.LibraryFunctions, CSharpExample", 
     r"PrintHelloWorld", 
     None) 
 
 my_function(None, 0) 
-

@@ -1,7 +1,7 @@
 import ctypes
 import sys 
 import os.path
-from typing import Optional 
+from typing import Optional, Sequence
 
 class DotNetHostError(Exception):
     def __init__(self, error_code, message):
@@ -20,8 +20,11 @@ if sys.platform == 'win32':
     c_tchar_p = ctypes.c_wchar_p 
     c_tstring = c_tchar_p 
 
-    def create_tstring_buffer(size): 
-        return ctypes.create_unicode_buffer(size) 
+    def to_tstring(s):
+        return s
+
+    def create_tstring_buffer(init_or_size): 
+        return ctypes.create_unicode_buffer(init_or_size) 
 
 else: 
     # There is no "stdcall" on Unix; the .NET Core API  just revert 
@@ -40,9 +43,10 @@ else:
     def to_tstring(s): 
         return s.encode('utf-8') 
 
-    def create_tstring_buffer(size): 
-        return  ctypes.create_string_buffer (size) 
-
+    def create_tstring_buffer(init_or_size): 
+        if isinstance(init_or_size, str):
+            init_or_size = to_tstring(init_or_size)
+        return ctypes.create_string_buffer(init_or_size) 
 
 def _c_int_error_check(result: ctypes.c_int, func, arguments): 
     if result != 0: 
@@ -133,133 +137,162 @@ component_entry_point_fn = \
 
 _g_nethost = None 
 
-class HostFxr(): 
+
+class DotNetSession(): 
 
     @classmethod 
-    def _get_nethost_dll(cls): 
-       global _g_nethost 
-       nethost = _g_nethost 
+    def _get_nethost_dll(cls):
+        """
+        Get the ctypes object for the "nethost" DLL.  This DLL
+        discovers installations of .NET Core.
 
-       if nethost is None: 
-           nethost_dll_path = os.path.join(os.path.dirname(__file__), nethost_platform, nethost_dll_name)
-           nethost = windll.LoadLibrary(nethost_dll_path) 
+        The "nethost" DLL should be packaged together with this Python module,
+        for each supported platform of .NET Core.
+        """
 
-       f = nethost.get_hostfxr_path 
-       f.errcheck = _c_int_error_check 
-       f.restype = ctypes.c_int 
-       f.argtypes = [ c_tchar_p, 
-                      ctypes.POINTER(ctypes.c_size_t), 
-                      ctypes.POINTER(get_hostfxr_parameters) ] 
+        global _g_nethost 
+        nethost = _g_nethost 
 
-       _g_nethost = nethost 
-       return nethost 
+        if nethost is None: 
+            nethost_dll_path = os.path.join(os.path.dirname(__file__), nethost_platform, nethost_dll_name)
+            nethost = windll.LoadLibrary(nethost_dll_path) 
+
+        f = nethost.get_hostfxr_path 
+        f.errcheck = _c_int_error_check 
+        f.restype = ctypes.c_int 
+        f.argtypes = [ c_tchar_p, 
+                       ctypes.POINTER(ctypes.c_size_t), 
+                       ctypes.POINTER(get_hostfxr_parameters) ] 
+
+        _g_nethost = nethost 
+        return nethost 
 
     @classmethod 
-    def get_dll_path(cls): 
-       nethost = HostFxr._get_nethost_dll() 
+    def get_dll_path(cls) -> str:
+        """
+        Get the location of a "hostfxr" DLL for some installation
+        of .NET Core.
 
-       pathBuf = create_tstring_buffer (4096) 
-       pathBufLen = ctypes.c_size_t(len(pathBuf)) 
+        This location is discovered using the "nethost" DLL.
+        """
 
-       nethost.get_hostfxr_path(pathBuf,  pathBufLen, None) 
-       return pathBuf.value 
+        nethost = DotNetSession._get_nethost_dll() 
 
-    def __init__(self, path=None): 
-       if path is None: 
-          path = HostFxr.get_dll_path() 
+        pathBuf = create_tstring_buffer (4096) 
+        pathBufLen = ctypes.c_size_t(len(pathBuf)) 
 
-       # hostfxr is cdecl even on Windows 
-       hostfxr = cdll.LoadLibrary(path) 
-       self._dll = hostfxr 
+        nethost.get_hostfxr_path(pathBuf,  pathBufLen, None) 
+        return pathBuf.value 
 
-       # See https://github.com/dotnet/runtime/blob/master/src/installer/corehost/cli/hostfxr.h 
+    @classmethod
+    def _get_hostfxr_dll(cls, path: str):
+        # hostfxr is cdecl even on Windows 
+        hostfxr = cdll.LoadLibrary(path) 
+ 
+        # See https://github.com/dotnet/runtime/blob/master/src/installer/corehost/cli/hostfxr.h 
+ 
+        f = hostfxr.hostfxr_initialize_for_runtime_config 
+        f.errcheck = _c_int_error_check 
+        f.restype = ctypes.c_int 
+        f.argtypes = [ c_tchar_p,                                       # runtime_config_path 
+                       ctypes.POINTER(hostfxr_initialize_parameters), 
+                       ctypes.POINTER(c_hostfxr_handle) ]               # OUT host_context_handle 
+ 
+        f = hostfxr.hostfxr_get_runtime_property_value 
+        f.errcheck = _c_int_error_check 
+        f.restype = ctypes.c_int 
+        f.argtypes = [ c_hostfxr_handle,            # host_context_handle 
+                       c_tchar_p,                   # name 
+                       ctypes.POINTER(c_tchar_p)]   # OUT value 
+ 
+        f = hostfxr.hostfxr_set_runtime_property_value 
+        f.errcheck = _c_int_error_check 
+        f.restype = ctypes.c_int 
+        f.argtypes = [ c_hostfxr_handle,            # host_context_handle 
+                       c_tchar_p,                   # name 
+                       c_tchar_p]                   # value 
+ 
+        f = hostfxr.hostfxr_get_runtime_properties 
+        f.errcheck = _c_int_error_check 
+        f.restype = ctypes.c_int 
+        f.argtypes =  [ c_hostfxr_handle,                   # host_context_handle 
+                       ctypes.POINTER(ctypes.c_size_t),     # IN/OUT count 
+                       ctypes.POINTER(c_tchar_p),           # OUT keys 
+                       ctypes.POINTER(c_tchar_p) ]          # OUT values 
+ 
+        f = hostfxr.hostfxr_get_runtime_delegate 
+        f.errcheck = _c_int_error_check 
+        f.restype = ctypes.c_int 
+        f.argtypes = [ c_hostfxr_handle,             # host_context_handle 
+                       ctypes.c_int,                 # enum hostfxr_delegate_ type 
+                       ctypes.POINTER(ctypes.c_void_p)] # OUT void**  delegate 
+ 
+        f = hostfxr.hostfxr_close 
+        f.errcheck = _c_int_error_check 
+        f.restype = ctypes.c_int 
+        f.argtypes = [ c_hostfxr_handle ] 
 
-       f = hostfxr.hostfxr_initialize_for_dotnet_command_line 
-       f.errcheck = _c_int_error_check 
-       f.restype = ctypes.c_int 
-       f.argtypes = [ ctypes.c_int,                                    # argc
-                      ctypes.POINTER(c_tchar_p),                       # const char* argv[]
-                      ctypes.POINTER(hostfxr_initialize_parameters), 
-                      ctypes.POINTER(c_hostfxr_handle) ]               # OUT host_context_handle 
-
-
-       f = hostfxr.hostfxr_initialize_for_runtime_config 
-
-       f.errcheck = _c_int_error_check 
-       f.restype = ctypes.c_int 
-       f.argtypes = [ c_tchar_p,                                       # runtime_config_path 
-                      ctypes.POINTER(hostfxr_initialize_parameters), 
-                      ctypes.POINTER(c_hostfxr_handle) ]               # OUT host_context_handle 
-
-
-       f = hostfxr.hostfxr_get_runtime_property_value 
-       f.errcheck = _c_int_error_check 
-       f.restype = ctypes.c_int 
-       f.argtypes = [ c_hostfxr_handle,            # host_context_handle 
-                      c_tchar_p,                   # name 
-                      ctypes.POINTER(c_tchar_p)]   # OUT value 
-
-       f = hostfxr.hostfxr_set_runtime_property_value 
-       f.errcheck = _c_int_error_check 
-       f.restype = ctypes.c_int 
-       f.argtypes = [ c_hostfxr_handle,            # host_context_handle 
-                      c_tchar_p,                   # name 
-                      c_tchar_p]                   # value 
-
-       f = hostfxr.hostfxr_get_runtime_properties 
-       f.errcheck = _c_int_error_check 
-       f.restype = ctypes.c_int 
-       f.argtypes =  [ c_hostfxr_handle,                   # host_context_handle 
-                      ctypes.POINTER(ctypes.c_size_t),     # IN/OUT count 
-                      ctypes.POINTER(c_tchar_p),           # OUT keys 
-                      ctypes.POINTER(c_tchar_p) ]          # OUT values 
-
-
-       f = hostfxr.hostfxr_get_runtime_delegate 
-       f.errcheck = _c_int_error_check 
-       f.restype = ctypes.c_int 
-       f.argtypes = [ c_hostfxr_handle,             # host_context_handle 
-                      ctypes.c_int,                 # enum hostfxr_delegate_ type 
-                      ctypes.POINTER(ctypes.c_void_p)] # OUT void**  delegate 
+        return hostfxr
 
 
-       f = hostfxr.hostfxr_run_app 
-       f.errcheck = _c_int_error_check 
-       f.restype = ctypes.c_int 
-       f.argtypes = [ c_hostfxr_handle ] 
+    def __init__(self, 
+                 config_path: Optional[str] = None,
+                 host_path: Optional[str] = None,
+                 dotnet_root: Optional[str] = None,
+                 dll_path: Optional[str] = None):
 
-       f = hostfxr.hostfxr_close 
-       f.errcheck = _c_int_error_check 
-       f.restype = ctypes.c_int 
-       f.argtypes = [ c_hostfxr_handle ] 
+        self._hostfxr_handle = None
 
-    def initialize_for_runtime_config(
-            self, 
-            config_path:  str, 
-            parameters: Optional[hostfxr_initialize_parameters]) -> c_hostfxr_handle: 
+        if dll_path is None: 
+            dll_path = DotNetSession.get_dll_path() 
 
-        handle = c_hostfxr_handle() 
-        self._dll.hostfxr_initialize_for_runtime_config( 
-            config_path, 
-            parameters, 
-            handle) 
-        return handle 
+        self._dll = DotNetSession._get_hostfxr_dll(dll_path)
+
+        parameters = None
+        if host_path is not None or dotnet_root is not None:
+            parameters = hostfxr_initialize_parameters()
+            parameters.size = ctypes.sizeof(hostfxr_initialize_parameters)
+            if host_path is not None:
+                parameters.host_path = create_tstring_buffer(host_path)
+            if dotnet_root is not None:
+                parameters.dotnet_root = create_tstring_buffer(dotnet_root)
+
+        handle = c_hostfxr_handle()
+        self._dll.hostfxr_initialize_for_runtime_config(
+            to_tstring(config_path),
+            parameters,
+            handle
+        )
+
+        self._hostfxr_handle = handle
+        self._load_assembly_and_get_function_pointer = None
+
+    def __del__(self):
+        handle = self._hostfxr_handle
+        if handle is not None:
+            self._hostfxr_handle = None
+            self._dll.hostfxr_close(handle)
 
     def load_assembly_and_get_function_pointer( 
             self, 
-            handle: c_hostfxr_handle, 
             assembly_path: str, 
             type_name: str, 
             method_name: str, 
             delegate_name: Optional[str] = None): 
 
         delegate = ctypes.c_void_p() 
-        self._dll.hostfxr_get_runtime_delegate( 
-            handle, 
-            hostfxr_delegate_type.hdt_load_assembly_and_get_function_pointer, 
-            delegate) 
-        f = ctypes.cast(delegate, load_assembly_and_get_function_pointer_fn) 
 
+        f = self._load_assembly_and_get_function_pointer
+        if f is None:
+            f = ctypes.c_void_p()
+            self._dll.hostfxr_get_runtime_delegate( 
+                self._hostfxr_handle, 
+                hostfxr_delegate_type.hdt_load_assembly_and_get_function_pointer, 
+                f) 
+            f = ctypes.cast(f, load_assembly_and_get_function_pointer_fn) 
+            self._load_assembly_and_get_function_pointer = f
+
+        delegate = ctypes.c_void_p()
         err = f(assembly_path, type_name, method_name, delegate_name, None, delegate) 
         if err < 0: 
             raise ValueError("load_assembly_and_get_function_pointer failed") 
@@ -269,12 +302,12 @@ class HostFxr():
 
         return delegate 
 
-    def get_runtime_properties(self, handle: c_hostfxr_handle): 
+    def get_runtime_properties(self): 
         capacity = 4096 
         keys_array = (c_tchar_p * capacity)() 
         values_array = (c_tchar_p * capacity)() 
         count = ctypes.c_size_t(capacity) 
-        self._dll.hostfxr_get_runtime_properties(handle, 
+        self._dll.hostfxr_get_runtime_properties(self._hostfxr_handle, 
                                                  count, 
                                                  keys_array, 
                                                  values_array) 
