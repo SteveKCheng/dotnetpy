@@ -3,6 +3,6 @@
 param ([Parameter(Mandatory=$true)][string]$url, [Parameter(Mandatory=$true)][string]$file)
 $ErrorActionPreference = "Stop"
 $client = New-Object System.Net.WebClient
-$client.UseDefaultCredentials = $true
 $client.Proxy = [System.Net.WebRequest]::GetSystemWebProxy()
+$client.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
 $client.DownloadFile($url, $file)
