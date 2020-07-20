@@ -19,6 +19,14 @@ formatting or message serialization to pass more complex data.  It should also b
 possible to get .NET code to work with Python objects by calling CPython's API
 through [P/Invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke).
 
+Example
+-------
+
+After compiling the [example C# source code](example/CSharpExample/LibraryFunctions.cs), running ``test.py`` results in:
+
+    > python test.py
+    Hello world! 世界に挨拶します　argPtr=0 argSize=0
+
 Supported platforms
 -------------------
 
@@ -67,8 +75,8 @@ Limitations
      You can always activate .NET Core-authored COM components using its built-in 
      COM hosting and the ``pythoncom`` module, without going through _dotnetpy_.
 
-Technical information on hosting a .NET Core run-time
------------------------------------------------------
+Relevant technical information on .NET Core
+-------------------------------------------
 
    * [.NET Core GitHub: design for native hosting](https://github.com/dotnet/runtime/blob/3b5a51a297c8fe2ea1780adbfdbb5ae6cf48b18a/docs/design/features/native-hosting.md)
    * [.NET Core GitHub: support custom hosting a hybrid between an application and a component](https://github.com/dotnet/runtime/issues/35465): background on how ``hostfxr`` works
