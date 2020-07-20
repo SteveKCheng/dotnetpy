@@ -11,9 +11,12 @@ if not os.path.exists(assembly_path):
 
 session = DotNetSession(config_path=os.path.join(this_dir, "example/DotNetRuntimeConfig.json"))
 
-properties = session.get_runtime_properties()
-for key, value in properties: 
-    print("%s = %s" % (key, value)) 
+#properties = session.get_runtime_properties()
+#for key, value in properties: 
+#    print("%s = %s" % (key, value)) 
+
+session.set_runtime_property_value("System.GC.Server", "false")
+print("System.GC.Server = %s" % session.get_runtime_property_value("System.GC.Server"))
 
 my_function = session.load_assembly_and_get_function_pointer( 
     assembly_path,

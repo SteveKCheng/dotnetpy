@@ -322,3 +322,15 @@ class DotNetSession():
 
         return [ (from_tstring(keys_array[i]), from_tstring(values_array[i])) \
                  for i in range(count.value) ]
+
+    def get_runtime_property_value(self, key: str):
+        value = c_tchar_p()
+        self._dll.hostfxr_get_runtime_property_value(self._hostfxr_handle, 
+                                                     to_tstring(key),
+                                                     value)
+        return from_tstring(value)
+
+    def set_runtime_property_value(self, key: str, value: str):
+        self._dll.hostfxr_set_runtime_property_value(self._hostfxr_handle, 
+                                                     to_tstring(key),
+                                                     to_tstring(value))
