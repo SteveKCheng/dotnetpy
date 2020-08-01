@@ -49,7 +49,8 @@ setuptools.setup(
         "Operating System :: Microsoft :: Windows",
         "Operating System :: POSIX :: Linux",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.6",
     package_data={"dotnetpy": [ nethost_dll ]},
     cmdclass={"bdist_wheel": my_bdist_wheel},
+    zip_safe=False,
 )
