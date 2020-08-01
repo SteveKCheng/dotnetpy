@@ -94,6 +94,7 @@ Relevant technical information on .NET Core
    * [.NET Core GitHub: summary of older hosting APIs](https://github.com/dotnet/runtime/blob/4f9ae42d861fcb4be2fcd5d3d55d5f227d30e723/docs/design/features/hosting-layer-apis.md)
    * [.NET Core GitHub: summary of AssemblyLoadContext](https://github.com/dotnet/coreclr/blob/master/Documentation/design-docs/assemblyloadcontext.md)
    * [Deep dive into .NET Core primitives: ``deps.json``, ``runtimeconfig.json``, and DLLs](https://natemcmaster.com/blog/2017/12/21/netcore-primitives/)
-   * [.NET Core source code: ``Internal.Runtime.InteropServices.ComponentActivator.cs``](https://github.com/dotnet/runtime/blob/6072e4d3a7a2a1493f514cdf4be75a3d56580e84/src/coreclr/src/System.Private.CoreLib/src/Internal/Runtime/InteropServices/ComponentActivator.cs): what ``load_assembly_and_get_function_pointer`` really does
+   * [JSON schema for .NET Core's ``runtimeconfig.json`` file](https://gist.github.com/natemcmaster/0bdee16450f8ec1823f2c11af880ceeb)
+   * [.NET Core source code: ``Internal.Runtime.InteropServices/ComponentActivator.cs``](https://github.com/dotnet/runtime/blob/6072e4d3a7a2a1493f514cdf4be75a3d56580e84/src/coreclr/src/System.Private.CoreLib/src/Internal/Runtime/InteropServices/ComponentActivator.cs): what ``load_assembly_and_get_function_pointer`` really does
    * [.NET Core source code: ``hostpolicy/hostpolicy.cpp``](https://github.com/dotnet/runtime/blob/6072e4d3a7a2a1493f514cdf4be75a3d56580e84/src/installer/corehost/cli/hostpolicy/hostpolicy.cpp#L454): what ``get_runtime_delegate`` really does
-
+   * [.NET Core source code: ``System/AppContext.cs``](https://github.com/dotnet/runtime/blob/6072e4d3a7a2a1493f514cdf4be75a3d56580e84/src/libraries/System.Private.CoreLib/src/System/AppContext.cs): relation between run-time switches and ``System.AppContext``
